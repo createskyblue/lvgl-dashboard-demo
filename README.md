@@ -1,4 +1,4 @@
-# LVGL 320×240 模拟器
+# LVGL 仪表盘 DEMO
 
 LVGL v9.5.0 + SDL2 · 双页面数据仪表盘
 
