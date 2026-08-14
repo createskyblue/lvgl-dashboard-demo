@@ -21,7 +21,7 @@
 #define COL_RED_TX   lv_color_hex(0x991B1B)
 #define COL_ICON_BG  lv_color_hex(0xF3F4F6)
 #define COL_CHART    lv_color_hex(0x0EA5E9)
-#define COL_GRID     lv_color_hex(0xE8ECF1)
+#define COL_GRID     lv_color_hex(0xD6DCE3)
 
 #define POINTS 40
 static int32_t co2_data[POINTS];
@@ -180,56 +180,56 @@ static void area_draw_cb(lv_event_t *e)
 
     lv_fpoint_t p, c1, c2;
 
-    /* ---- gridlines BEHIND the fill (native lines drawn first) ---- */
-    if(ctx->grid > 0) {
-        lv_draw_line_dsc_t ld;
-        lv_draw_line_dsc_init(&ld);
-        ld.base.layer = layer;
-        ld.color = ctx->grid_color;
-        ld.opa = LV_OPA_60;
-        ld.width = 1;
-        for(uint8_t k = 1; k <= ctx->grid; k++) {
-            int32_t gy = y0 + (int32_t)((int64_t)h * (int64_t)k / (int64_t)(ctx->grid + 1));
-            ld.p1.x = x0; ld.p1.y = gy;
-            ld.p2.x = x0 + w; ld.p2.y = gy;
-            lv_draw_line(layer, &ld);
-        }
-    }
 
-    /* ---- area fill: 24 horizontal bands of 1px-wide solid column rects,
-     *      drawn only BELOW the curve (no erase, so the full-width gridlines
-     *      stay visible in the area above the curve and faintly through the
-     *      translucent fill). Band opacity follows the absolute height. ---- */
-    lv_draw_vector_dsc_set_fill_color(dsc, ctx->color);
-    const int GRAD_BANDS = 24;
-    for(int b = 0; b < GRAD_BANDS; b++) {
-        int32_t band_top = y0 + (int32_t)((int64_t)h * b / GRAD_BANDS);
-        int32_t band_bot = y0 + (int32_t)((int64_t)h * (b + 1) / GRAD_BANDS);
-        if(band_bot <= band_top) continue;
-        float frac = ((float)(band_top + band_bot) * 0.5f - (float)y0) / (float)h;
-        lv_opa_t opa = (lv_opa_t)(130.0f * (1.0f - frac));
-        if(opa < 2) continue;
-        lv_vector_path_clear(path);
-        for(int32_t s = 0; s < w; s++) {
-            float fx = (float)s / (float)(w - 1) * (float)(ctx->n - 1);
-            int i = (int)fx;
-            if(i > (int)ctx->n - 2) i = (int)ctx->n - 2;
-            float fr = fx - i;
-            int32_t ytop = (int32_t)(ys[i] + (ys[i + 1] - ys[i]) * fr + 0.5f);
-            if(ytop < y0) ytop = y0;
-            if(ytop > y0 + h) ytop = y0 + h;
-            int32_t rtop = ytop > band_top ? ytop : band_top;
-            if(rtop >= band_bot) continue;
-            int32_t xa = x0 + s;
-            int32_t xb = xa + 1;
-            p.x = (float)xa; p.y = (float)rtop; lv_vector_path_move_to(path, &p);
-            p.x = (float)xb; p.y = (float)rtop; lv_vector_path_line_to(path, &p);
-            p.x = (float)xb; p.y = (float)band_bot; lv_vector_path_line_to(path, &p);
-            p.x = (float)xa; p.y = (float)band_bot; lv_vector_path_line_to(path, &p);
-            lv_vector_path_close(path);
+    /* ---- area fill: one native vertical-gradient rect (true smooth gradient),
+     *      then erase the part above the curve with per-column background rects. ---- */
+    lv_draw_rect_dsc_t gd;
+    lv_draw_rect_dsc_init(&gd);
+    gd.base.layer = layer;
+    gd.bg_color = ctx->color;
+    gd.bg_grad.dir = LV_GRAD_DIR_VER;
+    gd.bg_grad.stops_count = 2;
+    gd.bg_grad.stops[0].color = ctx->color; gd.bg_grad.stops[0].opa = 190; gd.bg_grad.stops[0].frac = 0;
+    gd.bg_grad.stops[1].color = ctx->color; gd.bg_grad.stops[1].opa = 0;   gd.bg_grad.stops[1].frac = 255;
+    gd.bg_opa = LV_OPA_COVER;
+    lv_area_t full;
+    full.x1 = x0; full.y1 = y0; full.x2 = x0 + w - 1; full.y2 = y0 + h - 1;
+    lv_draw_rect(layer, &gd, &full);
+
+    lv_draw_rect_dsc_t ed;
+    lv_draw_rect_dsc_init(&ed);
+    ed.base.layer = layer;
+    ed.bg_color = ctx->bg;
+    ed.bg_opa = LV_OPA_COVER;
+    lv_draw_rect_dsc_t gdline;
+    lv_draw_rect_dsc_init(&gdline);
+    gdline.base.layer = layer;
+    gdline.bg_color = ctx->grid_color;
+    gdline.bg_opa = LV_OPA_COVER;
+    for(int32_t s = 0; s < w; s++) {
+        float fx = (float)s / (float)(w - 1) * (float)(ctx->n - 1);
+        int i = (int)fx;
+        if(i > (int)ctx->n - 2) i = (int)ctx->n - 2;
+        float fr = fx - i;
+        int32_t ytop = (int32_t)(ys[i] + (ys[i + 1] - ys[i]) * fr + 0.5f);
+        if(ytop < y0) ytop = y0;
+        if(ytop > y0 + h) ytop = y0 + h;
+        if(ytop <= y0 + 1) continue;
+        lv_area_t a;
+        a.x1 = x0 + s; a.x2 = x0 + s;
+        a.y1 = y0; a.y2 = ytop - 1;
+        lv_draw_rect(layer, &ed, &a);
+        /* draw the gridlines at the same time, wherever the erased area covers them */
+        if(ctx->grid > 0) {
+            for(uint8_t k = 1; k <= ctx->grid; k++) {
+                int32_t gy = y0 + (int32_t)((int64_t)h * (int64_t)k / (int64_t)(ctx->grid + 1));
+                if(gy < y0 || gy >= ytop) continue;
+                lv_area_t g;
+                g.x1 = x0 + s; g.x2 = x0 + s;
+                g.y1 = gy; g.y2 = gy;
+                lv_draw_rect(layer, &gdline, &g);
+            }
         }
-        lv_draw_vector_dsc_set_fill_opa(dsc, opa);
-        lv_draw_vector_dsc_add_path(dsc, path);
     }
 
 
@@ -519,7 +519,7 @@ lv_obj_t *ui_create_power(void)
         { "VOLTAGE", "V",   "V",   lv_color_hex(0x3B82F6), lv_color_hex(0xDBEAFE), 220.5, 1.5, 0.00, 1001u },
         { "CURRENT", "A",   "A",   lv_color_hex(0x10B981), lv_color_hex(0xD1FAE5), -12.3, 4.0, 0.00, 2002u },
         { "POWER",   "W",   "W",   lv_color_hex(0xF59E0B), lv_color_hex(0xFEF3C7), -456.7, 80.0, 0.00, 3003u },
-        { "ENERGY",  "kWh", "kWh", lv_color_hex(0x8B5CF6), lv_color_hex(0xEDE9FE), 123.4, 0.4, 0.30, 4004u },
+        { "ENERGY",  "kWh", "E",   lv_color_hex(0x8B5CF6), lv_color_hex(0xEDE9FE), 123.4, 0.4, 0.30, 4004u },
     };
     const int pos[4][2] = { {8, 4}, {164, 4}, {8, 124}, {164, 124} };
     for(int i = 0; i < 4; i++) make_meter_card(scr, pos[i][0], pos[i][1], &meters[i]);
