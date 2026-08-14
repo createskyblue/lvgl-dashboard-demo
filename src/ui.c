@@ -180,6 +180,22 @@ static void area_draw_cb(lv_event_t *e)
 
     lv_fpoint_t p, c1, c2;
 
+    /* ---- gridlines BEHIND the fill (native lines drawn first) ---- */
+    if(ctx->grid > 0) {
+        lv_draw_line_dsc_t ld;
+        lv_draw_line_dsc_init(&ld);
+        ld.base.layer = layer;
+        ld.color = ctx->grid_color;
+        ld.opa = LV_OPA_60;
+        ld.width = 1;
+        for(uint8_t k = 1; k <= ctx->grid; k++) {
+            int32_t gy = y0 + (int32_t)((int64_t)h * (int64_t)k / (int64_t)(ctx->grid + 1));
+            ld.p1.x = x0; ld.p1.y = gy;
+            ld.p2.x = x0 + w; ld.p2.y = gy;
+            lv_draw_line(layer, &ld);
+        }
+    }
+
     /* ---- area fill (experiment): one native vertical-gradient rect over the
      *      whole widget (LVGL's own lv_draw_rect gradient, no thorvg fill),
      *      then erase the part above the curve with per-column background rects. ---- */
@@ -216,22 +232,6 @@ static void area_draw_cb(lv_event_t *e)
         lv_draw_rect(layer, &ed, &a);
     }
 
-    /* ---- optional horizontal gridlines ---- */
-    if(ctx->grid > 0) {
-        lv_vector_path_clear(path);
-        lv_draw_vector_dsc_set_fill_opa(dsc, 0);
-        lv_draw_vector_dsc_set_stroke_color(dsc, ctx->grid_color);
-        lv_draw_vector_dsc_set_stroke_opa(dsc, LV_OPA_60);
-        lv_draw_vector_dsc_set_stroke_width(dsc, 1.0f);
-        for(uint8_t k = 1; k <= ctx->grid; k++) {
-            int32_t gy = y0 + (int32_t)((int64_t)h * (int64_t)k / (int64_t)(ctx->grid + 1));
-            p.x = (float)x0; p.y = (float)gy;
-            lv_vector_path_move_to(path, &p);
-            p.x = (float)(x0 + w);
-            lv_vector_path_line_to(path, &p);
-            lv_draw_vector_dsc_add_path(dsc, path);
-        }
-    }
 
     /* ---- smooth stroke line on top ---- */
     lv_vector_path_clear(path);
