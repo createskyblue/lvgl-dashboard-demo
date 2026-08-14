@@ -1,4 +1,5 @@
 build/
 lvgl/
-*.png
 *.raw
+*.png
+!docs/*.png

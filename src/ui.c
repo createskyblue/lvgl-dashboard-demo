@@ -125,6 +125,29 @@ static void catmull_ctrl(const int32_t *xs, const int32_t *ys, int n, int i,
     c2->y = ys[i + 1] - (float)(ys[i3] - ys[i]) / 6.0f;
 }
 
+/* Evaluate the Catmull-Rom curve's y at a given column.
+ * xs are evenly spaced so the bezier's x is linear in t -> exact match
+ * with the stroke path used by curve_append. */
+static int32_t curve_y_at(int32_t s, int32_t w, const int32_t *xs, const int32_t *ys, int n)
+{
+    if(w <= 1) return ys[0];
+    float fx = (float)s / (float)(w - 1) * (float)(n - 1);
+    int i = (int)fx;
+    if(i < 0) i = 0;
+    if(i > n - 2) i = n - 2;
+    float t = fx - i;
+    if(t < 0.0f) t = 0.0f;
+    if(t > 1.0f) t = 1.0f;
+    lv_fpoint_t c1, c2;
+    catmull_ctrl(xs, ys, n, i, &c1, &c2);
+    float mt = 1.0f - t;
+    float y = mt * mt * mt * (float)ys[i]
+              + 3.0f * mt * mt * t * c1.y
+              + 3.0f * mt * t * t * c2.y
+              + t * t * t * (float)ys[i + 1];
+    return (int32_t)(y + 0.5f);
+}
+
 /* append the smooth curve through points 0..n-1 (move_to first point, then cubic_to) */
 static void curve_append(lv_vector_path_t *path, const int32_t *xs, const int32_t *ys, int n)
 {
@@ -206,24 +229,24 @@ static void area_draw_cb(lv_event_t *e)
     gdline.base.layer = layer;
     gdline.bg_color = ctx->grid_color;
     gdline.bg_opa = LV_OPA_COVER;
+    /* erase this many px less per column so the fill tucks under the stroke
+     * and the 2px line covers the boundary without a seam */
+    const int32_t ERASE_REDUCE = 1;
     for(int32_t s = 0; s < w; s++) {
-        float fx = (float)s / (float)(w - 1) * (float)(ctx->n - 1);
-        int i = (int)fx;
-        if(i > (int)ctx->n - 2) i = (int)ctx->n - 2;
-        float fr = fx - i;
-        int32_t ytop = (int32_t)(ys[i] + (ys[i + 1] - ys[i]) * fr + 0.5f);
+        int32_t ytop = curve_y_at(s, w, xs, ys, (int)ctx->n);
         if(ytop < y0) ytop = y0;
         if(ytop > y0 + h) ytop = y0 + h;
-        if(ytop <= y0 + 1) continue;
+        int32_t erase_bot = ytop - 1 - ERASE_REDUCE;
+        if(erase_bot < y0) continue;
         lv_area_t a;
         a.x1 = x0 + s; a.x2 = x0 + s;
-        a.y1 = y0; a.y2 = ytop - 1;
+        a.y1 = y0; a.y2 = erase_bot;
         lv_draw_rect(layer, &ed, &a);
         /* draw the gridlines at the same time, wherever the erased area covers them */
         if(ctx->grid > 0) {
             for(uint8_t k = 1; k <= ctx->grid; k++) {
                 int32_t gy = y0 + (int32_t)((int64_t)h * (int64_t)k / (int64_t)(ctx->grid + 1));
-                if(gy < y0 || gy >= ytop) continue;
+                if(gy < y0 || gy >= ytop - ERASE_REDUCE) continue;
                 lv_area_t g;
                 g.x1 = x0 + s; g.x2 = x0 + s;
                 g.y1 = gy; g.y2 = gy;
