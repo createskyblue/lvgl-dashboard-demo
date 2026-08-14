@@ -1,0 +1,4 @@
+build/
+lvgl/
+*.png
+*.raw
