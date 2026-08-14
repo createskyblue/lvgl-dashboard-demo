@@ -99,6 +99,7 @@ typedef struct {
     int32_t *data;       /* owned copy of the trend values */
     uint32_t n;
     lv_color_t color;
+    lv_color_t bg;       /* card background used to erase above the curve */
     uint8_t grid;        /* number of horizontal gridlines */
     lv_color_t grid_color;
 } area_ctx_t;
@@ -179,40 +180,40 @@ static void area_draw_cb(lv_event_t *e)
 
     lv_fpoint_t p, c1, c2;
 
-    /* ---- area fill: one thin vertical strip per pixel column.
-     *      Strips are convex rectangles (thorvg fills those reliably),
-     *      and the gradient is anchored to the widget's absolute top/bottom
-     *      so neighbouring strips blend into one continuous gradient. ---- */
-    lv_draw_vector_dsc_set_fill_color(dsc, ctx->color);
-    const int GRAD_BANDS = 24;
-    for(int b = 0; b < GRAD_BANDS; b++) {
-        int32_t band_top = y0 + (int32_t)((int64_t)h * b / GRAD_BANDS);
-        int32_t band_bot = y0 + (int32_t)((int64_t)h * (b + 1) / GRAD_BANDS);
-        if(band_bot <= band_top) continue;
-        float frac = ((float)(band_top + band_bot) * 0.5f - (float)y0) / (float)h;
-        lv_opa_t opa = (lv_opa_t)(190.0f * (1.0f - frac));
-        if(opa < 2) continue;
-        lv_vector_path_clear(path);
-        for(int32_t s = 0; s < w; s++) {
-            float fx = (float)s / (float)(w - 1) * (float)(ctx->n - 1);
-            int i = (int)fx;
-            if(i > (int)ctx->n - 2) i = (int)ctx->n - 2;
-            float fr = fx - i;
-            int32_t ytop = (int32_t)(ys[i] + (ys[i + 1] - ys[i]) * fr + 0.5f);
-            if(ytop < y0) ytop = y0;
-            if(ytop > y0 + h) ytop = y0 + h;
-            int32_t rtop = ytop > band_top ? ytop : band_top;
-            if(rtop >= band_bot) continue;
-            int32_t xa = x0 + s;
-            int32_t xb = xa + 1;
-            p.x = (float)xa; p.y = (float)rtop; lv_vector_path_move_to(path, &p);
-            p.x = (float)xb; p.y = (float)rtop; lv_vector_path_line_to(path, &p);
-            p.x = (float)xb; p.y = (float)band_bot; lv_vector_path_line_to(path, &p);
-            p.x = (float)xa; p.y = (float)band_bot; lv_vector_path_line_to(path, &p);
-            lv_vector_path_close(path);
-        }
-        lv_draw_vector_dsc_set_fill_opa(dsc, opa);
-        lv_draw_vector_dsc_add_path(dsc, path);
+    /* ---- area fill (experiment): one native vertical-gradient rect over the
+     *      whole widget (LVGL's own lv_draw_rect gradient, no thorvg fill),
+     *      then erase the part above the curve with per-column background rects. ---- */
+    lv_draw_rect_dsc_t gd;
+    lv_draw_rect_dsc_init(&gd);
+    gd.base.layer = layer;
+    gd.bg_color = ctx->color;
+    gd.bg_grad.dir = LV_GRAD_DIR_VER;
+    gd.bg_grad.stops_count = 2;
+    gd.bg_grad.stops[0].color = ctx->color; gd.bg_grad.stops[0].opa = 190; gd.bg_grad.stops[0].frac = 0;
+    gd.bg_grad.stops[1].color = ctx->color; gd.bg_grad.stops[1].opa = 0;   gd.bg_grad.stops[1].frac = 255;
+    gd.bg_opa = LV_OPA_COVER;
+    lv_area_t full;
+    full.x1 = x0; full.y1 = y0; full.x2 = x0 + w - 1; full.y2 = y0 + h - 1;
+    lv_draw_rect(layer, &gd, &full);
+
+    lv_draw_rect_dsc_t ed;
+    lv_draw_rect_dsc_init(&ed);
+    ed.base.layer = layer;
+    ed.bg_color = ctx->bg;
+    ed.bg_opa = LV_OPA_COVER;
+    for(int32_t s = 0; s < w; s++) {
+        float fx = (float)s / (float)(w - 1) * (float)(ctx->n - 1);
+        int i = (int)fx;
+        if(i > (int)ctx->n - 2) i = (int)ctx->n - 2;
+        float fr = fx - i;
+        int32_t ytop = (int32_t)(ys[i] + (ys[i + 1] - ys[i]) * fr + 0.5f);
+        if(ytop < y0) ytop = y0;
+        if(ytop > y0 + h) ytop = y0 + h;
+        if(ytop <= y0 + 1) continue;
+        lv_area_t a;
+        a.x1 = x0 + s; a.x2 = x0 + s;
+        a.y1 = y0; a.y2 = ytop - 1;
+        lv_draw_rect(layer, &ed, &a);
     }
 
     /* ---- optional horizontal gridlines ---- */
@@ -246,7 +247,8 @@ static void area_draw_cb(lv_event_t *e)
     lv_draw_vector_dsc_delete(dsc);
 }
 static void add_gradient_area(lv_obj_t *parent, const int32_t *data, uint32_t n,
-                              lv_color_t color, uint8_t grid, lv_color_t grid_color)
+                              lv_color_t color, uint8_t grid, lv_color_t grid_color,
+                              lv_color_t bg)
 {
     if(n < 2) return;
     area_ctx_t *ctx = (area_ctx_t *)lv_malloc(sizeof(area_ctx_t));
@@ -257,6 +259,7 @@ static void add_gradient_area(lv_obj_t *parent, const int32_t *data, uint32_t n,
     ctx->data = data_copy;
     ctx->n = n;
     ctx->color = color;
+    ctx->bg = bg;
     ctx->grid = grid;
     ctx->grid_color = grid_color;
 
@@ -369,7 +372,7 @@ void ui_create(void)
     lv_obj_t *unit = mk_label(vrow, "PPM", &lv_font_montserrat_14, COL_MUTED);
 
     /* --- chart: gradient-filled area --- */
-    add_gradient_area(card, co2_data, POINTS, COL_CHART, 3, COL_GRID);
+    add_gradient_area(card, co2_data, POINTS, COL_CHART, 3, COL_GRID, COL_CARD);
 
     /* --- footer row --- */
     lv_obj_t *frow = lv_obj_create(card);
@@ -434,7 +437,7 @@ static void fill_trend(const meter_t *m, int32_t *out)
 
 static void add_sparkline(lv_obj_t *card, const meter_t *m, const int32_t *data)
 {
-    add_gradient_area(card, data, TREND_PTS, m->accent, 0, COL_GRID);
+    add_gradient_area(card, data, TREND_PTS, m->accent, 0, COL_GRID, COL_CARD);
 }
 
 static void make_meter_card(lv_obj_t *parent, int x, int y, const meter_t *m)
