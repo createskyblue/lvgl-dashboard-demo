@@ -288,7 +288,10 @@ static void add_gradient_area(lv_obj_t *parent, const int32_t *data, uint32_t n,
 
     lv_obj_t *area = lv_obj_create(parent);
     lv_obj_remove_style_all(area);
-    lv_obj_set_width(area, LV_PCT(100));
+    /* In a row, flex-grow must own the remaining width; 100% would
+     * overlap the right-side Y-axis labels. */
+    lv_obj_set_width(area, LV_SIZE_CONTENT);
+    lv_obj_set_height(area, LV_PCT(100));
     lv_obj_set_flex_grow(area, 1);
     lv_obj_add_event_cb(area, area_draw_cb, LV_EVENT_DRAW_MAIN, ctx);
     lv_obj_add_event_cb(area, area_free_cb, LV_EVENT_DELETE, ctx);
@@ -458,9 +461,60 @@ static void fill_trend(const meter_t *m, int32_t *out)
     }
 }
 
+static void fmt_axis_value(int32_t raw, char *out, size_t n)
+{
+    const char sign = raw < 0 ? '-' : ' ';
+    const int32_t value = raw < 0 ? -raw : raw;
+    lv_snprintf(out, n, "%c%d.%d", sign, (int)(value / 10), (int)(value % 10));
+}
+
+static void add_axis_labels(lv_obj_t *parent, const int32_t *data, uint32_t n)
+{
+    int32_t mn = data[0];
+    int32_t mx = data[0];
+    for(uint32_t i = 1; i < n; i++) {
+        if(data[i] < mn) mn = data[i];
+        if(data[i] > mx) mx = data[i];
+    }
+
+    lv_obj_t *axis = lv_obj_create(parent);
+    lv_obj_remove_style_all(axis);
+    lv_obj_set_width(axis, 33);
+    lv_obj_set_height(axis, LV_PCT(100));
+    lv_obj_set_flex_flow(axis, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(axis, LV_FLEX_ALIGN_SPACE_BETWEEN,
+                          LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER);
+
+    char max_buf[16], min_buf[16];
+    fmt_axis_value(mx, max_buf, sizeof(max_buf));
+    fmt_axis_value(mn, min_buf, sizeof(min_buf));
+    lv_obj_t *max_label = lv_label_create(axis);
+    lv_label_set_text(max_label, max_buf);
+    lv_obj_set_width(max_label, LV_PCT(100));
+    lv_obj_set_style_text_align(max_label, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_style_text_font(max_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_color(max_label, COL_MUTED, 0);
+
+    lv_obj_t *min_label = lv_label_create(axis);
+    lv_label_set_text(min_label, min_buf);
+    lv_obj_set_width(min_label, LV_PCT(100));
+    lv_obj_set_style_text_align(min_label, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_style_text_font(min_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_color(min_label, COL_MUTED, 0);
+}
+
 static void add_sparkline(lv_obj_t *card, const meter_t *m, const int32_t *data)
 {
-    add_gradient_area(card, data, TREND_PTS, m->accent, 0, COL_GRID, COL_CARD);
+    lv_obj_t *chart_row = lv_obj_create(card);
+    lv_obj_remove_style_all(chart_row);
+    lv_obj_set_width(chart_row, LV_PCT(100));
+    lv_obj_set_flex_grow(chart_row, 1);
+    lv_obj_set_flex_flow(chart_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(chart_row, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    add_gradient_area(chart_row, data, TREND_PTS, m->accent, 0, COL_GRID, COL_CARD);
+    add_axis_labels(chart_row, data, TREND_PTS);
 }
 
 static void make_meter_card(lv_obj_t *parent, int x, int y, const meter_t *m)
