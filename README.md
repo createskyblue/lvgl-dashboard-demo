@@ -21,6 +21,32 @@ LVGL v9.5.0 + SDL2 · 双页面数据仪表盘
 
 > 不用 thorvg 渐变填充凹多边形：thorvg 会按包围盒填充，导致颜色溢出曲线外。
 
+## 趋势图 Y 轴布局
+
+电力趋势图支持两种 Y 轴显示方式，通过 CMake 宏 `LVGL_SIM_AXIS_OVERLAY` 切换：
+
+### 第一版：右侧保留紧凑数轴区域（默认）
+
+图表与数轴并排，右侧显示当前数据的最大值和最小值。
+
+![右侧紧凑数轴](docs/power_axis_side.png)
+
+### 第二版：数轴文字叠加在 full-width 图表上
+
+图表保持完整宽度，最大值和最小值直接叠加在图表右侧。
+
+![数轴叠加图表](docs/power_axis_overlay.png)
+
+```bash
+# 第一版：右侧紧凑数轴（默认）
+cmake -S . -B build -DLVGL_SIM_AXIS_OVERLAY=0
+cmake --build build
+
+# 第二版：数轴文字叠加在 full-width 图表上
+cmake -S . -B build-overlay -DLVGL_SIM_AXIS_OVERLAY=1
+cmake --build build-overlay
+```
+
 ## 运行
 
 ```bash

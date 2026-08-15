@@ -2,6 +2,10 @@
 #include <math.h>
 #include <stdlib.h>
 
+#ifndef LVGL_SIM_AXIS_OVERLAY
+#define LVGL_SIM_AXIS_OVERLAY 0  /* 0: side column, 1: overlay on full chart */
+#endif
+
 #define HOR_RES 320
 #define VER_RES 240
 
@@ -288,11 +292,16 @@ static void add_gradient_area(lv_obj_t *parent, const int32_t *data, uint32_t n,
 
     lv_obj_t *area = lv_obj_create(parent);
     lv_obj_remove_style_all(area);
-    /* In a row, flex-grow must own the remaining width; 100% would
-     * overlap the right-side Y-axis labels. */
+#if LVGL_SIM_AXIS_OVERLAY
+    /* Overlay mode: keep the chart at its original full width. */
+    lv_obj_set_width(area, LV_PCT(100));
+    lv_obj_set_height(area, LV_PCT(100));
+#else
+    /* Side-axis mode: let flex-grow consume the width left after the labels. */
     lv_obj_set_width(area, LV_SIZE_CONTENT);
     lv_obj_set_height(area, LV_PCT(100));
     lv_obj_set_flex_grow(area, 1);
+#endif
     lv_obj_add_event_cb(area, area_draw_cb, LV_EVENT_DRAW_MAIN, ctx);
     lv_obj_add_event_cb(area, area_free_cb, LV_EVENT_DELETE, ctx);
 }
@@ -479,8 +488,15 @@ static void add_axis_labels(lv_obj_t *parent, const int32_t *data, uint32_t n)
 
     lv_obj_t *axis = lv_obj_create(parent);
     lv_obj_remove_style_all(axis);
+#if LVGL_SIM_AXIS_OVERLAY
+    lv_obj_add_flag(axis, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_set_pos(axis, 0, 0);
+    lv_obj_set_width(axis, LV_PCT(100));
+    lv_obj_set_height(axis, LV_PCT(100));
+#else
     lv_obj_set_width(axis, 33);
     lv_obj_set_height(axis, LV_PCT(100));
+#endif
     lv_obj_set_flex_flow(axis, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(axis, LV_FLEX_ALIGN_SPACE_BETWEEN,
                           LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER);

@@ -81,7 +81,11 @@ assert all(c >= 8 for c in counts), 'expected two visible axis numbers in every 
 # Layout regression: the chart must own the row height and the numeric axis
 # should be only as wide as the longest label, not a visibly padded column.
 source = open("src/ui.c", "r", encoding="utf-8").read()
-assert "lv_obj_set_width(axis, 33);" in source, "axis column is still too wide"
-assert "lv_obj_set_height(area, LV_PCT(100));" in source, "chart does not fill the chart row"
+cmake = open("CMakeLists.txt", "r", encoding="utf-8").read()
+assert "#ifndef LVGL_SIM_AXIS_OVERLAY" in source
+assert "LVGL_SIM_AXIS_OVERLAY" in cmake
+assert "lv_obj_set_width(area, LV_PCT(100));" in source, "chart is not full width"
+assert "lv_obj_add_flag(axis, LV_OBJ_FLAG_IGNORE_LAYOUT);" in source, "axis is still consuming chart width"
+assert "lv_obj_set_width(axis, LV_PCT(100));" in source, "axis overlay is not full width"
 assert "lv_obj_set_style_text_align(max_label, LV_TEXT_ALIGN_RIGHT, 0);" in source
 assert "lv_obj_set_style_text_align(min_label, LV_TEXT_ALIGN_RIGHT, 0);" in source
