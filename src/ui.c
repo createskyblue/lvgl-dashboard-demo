@@ -477,7 +477,7 @@ static void fmt_axis_value(int32_t raw, char *out, size_t n)
     lv_snprintf(out, n, "%c%d.%d", sign, (int)(value / 10), (int)(value % 10));
 }
 
-static void add_axis_labels(lv_obj_t *parent, const int32_t *data, uint32_t n)
+static void add_axis_labels(lv_obj_t *parent, const int32_t *data, uint32_t n, lv_color_t color)
 {
     int32_t mn = data[0];
     int32_t mx = data[0];
@@ -509,14 +509,14 @@ static void add_axis_labels(lv_obj_t *parent, const int32_t *data, uint32_t n)
     lv_obj_set_width(max_label, LV_PCT(100));
     lv_obj_set_style_text_align(max_label, LV_TEXT_ALIGN_RIGHT, 0);
     lv_obj_set_style_text_font(max_label, &lv_font_montserrat_10, 0);
-    lv_obj_set_style_text_color(max_label, COL_MUTED, 0);
+    lv_obj_set_style_text_color(max_label, color, 0);
 
     lv_obj_t *min_label = lv_label_create(axis);
     lv_label_set_text(min_label, min_buf);
     lv_obj_set_width(min_label, LV_PCT(100));
     lv_obj_set_style_text_align(min_label, LV_TEXT_ALIGN_RIGHT, 0);
     lv_obj_set_style_text_font(min_label, &lv_font_montserrat_10, 0);
-    lv_obj_set_style_text_color(min_label, COL_MUTED, 0);
+    lv_obj_set_style_text_color(min_label, color, 0);
 }
 
 static void add_sparkline(lv_obj_t *card, const meter_t *m, const int32_t *data)
@@ -530,7 +530,7 @@ static void add_sparkline(lv_obj_t *card, const meter_t *m, const int32_t *data)
                           LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     add_gradient_area(chart_row, data, TREND_PTS, m->accent, 0, COL_GRID, COL_CARD);
-    add_axis_labels(chart_row, data, TREND_PTS);
+    add_axis_labels(chart_row, data, TREND_PTS, m->accent);
 }
 
 static void make_meter_card(lv_obj_t *parent, int x, int y, const meter_t *m)

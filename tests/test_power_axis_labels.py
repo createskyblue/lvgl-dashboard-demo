@@ -55,14 +55,14 @@ def load_png(path):
     return width, height, rows
 
 
-def muted_pixels(rows, box):
+def theme_pixels(rows, box, rgb):
     x1, y1, x2, y2 = box
     count = 0
     for y in range(y1, y2):
         row = rows[y]
         for x in range(x1, x2):
             r, g, b = row[x * 4:x * 4 + 3]
-            if abs(r - 0x6B) <= 18 and abs(g - 0x72) <= 18 and abs(b - 0x80) <= 18:
+            if max(abs(r - rgb[0]), abs(g - rgb[1]), abs(b - rgb[2])) <= 70:
                 count += 1
     return count
 
@@ -74,8 +74,10 @@ assert (w, h) == (320, 240), (w, h)
 # column is inside these four regions.
 regions = [(110, 65, 153, 110), (266, 65, 309, 110),
            (110, 185, 153, 230), (266, 185, 309, 230)]
-counts = [muted_pixels(rows, box) for box in regions]
-print('muted-pixel counts:', counts)
+theme_colors = [(0x3B, 0x82, 0xF6), (0x10, 0xB9, 0x81),
+                 (0xF5, 0x9E, 0x0B), (0x8B, 0x5C, 0xF6)]
+counts = [theme_pixels(rows, box, color) for box, color in zip(regions, theme_colors)]
+print('theme-color pixel counts:', counts)
 assert all(c >= 8 for c in counts), 'expected two visible axis numbers in every chart'
 
 # Layout regression: the chart must own the row height and the numeric axis
@@ -89,3 +91,6 @@ assert "lv_obj_add_flag(axis, LV_OBJ_FLAG_IGNORE_LAYOUT);" in source, "axis is s
 assert "lv_obj_set_width(axis, LV_PCT(100));" in source, "axis overlay is not full width"
 assert "lv_obj_set_style_text_align(max_label, LV_TEXT_ALIGN_RIGHT, 0);" in source
 assert "lv_obj_set_style_text_align(min_label, LV_TEXT_ALIGN_RIGHT, 0);" in source
+assert "add_axis_labels(chart_row, data, TREND_PTS, m->accent);" in source
+assert "lv_obj_set_style_text_color(max_label, color, 0);" in source
+assert "lv_obj_set_style_text_color(min_label, color, 0);" in source
